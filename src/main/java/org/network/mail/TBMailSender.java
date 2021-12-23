@@ -8,6 +8,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.ParseException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Properties;
 
@@ -28,7 +32,7 @@ public class TBMailSender {
 
             message.setText(content);
 
-            System.out.printf("sending %s, %s, ...", to, toEmail);
+            System.out.printf("sending %s, %s, %s...", to, toEmail, content);
             // Send message
             Transport.send(message);
             System.out.println(" sent");
@@ -64,32 +68,47 @@ public class TBMailSender {
         return session;
     }
 
-    public static void main(String[] args) throws IOException {
+    private static void sendMailsToList(TBMailSender mailSender,
+                                        String content,
+                                        Session session,
+                                        List<String> successEmails) {
 
-        TBMailSender mailSender = new TBMailSender();
-        String contentPath = args[0];
-        String namesFile = args[1];
-
-//        System.out.println("password:");
-//        Scanner in = new Scanner(System.in);
-//        final String password = in.nextLine();
-
-        String content = Files.readString(Path.of(contentPath), StandardCharsets.US_ASCII);
-        String word = Files.readString(Path.of("/home/lb584/software/one_times/lbgmail.txt"), StandardCharsets.US_ASCII);
-        Session session = mailSender.getSession(word.trim());
-
-//        String names_file = "/home/lb584/git/ft_utils/src/main/resources/people_coming_emails.csv";
-//        String names_file = "/home/lb584/git/ft_utils/src/main/resources/test_tb_emails.csv";
-        List<String> results = Files.readAllLines(Paths.get(namesFile));
-
-        for (String line : results) {
+        for (String line : successEmails) {
             String[] tokens = line.split(",");
             String name = tokens[0].trim();
             String email = tokens[1].trim();
             mailSender.sendMail(name, email, session, content);
         }
+    }
+
+    public static void main(String[] args) throws IOException {
+
+        TBMailSender mailSender = new TBMailSender();
+        String contentPath = args[0];
+        String successEmailsFile = args[1];
+        String errorEmailFile = args[2];
+        String dateString = args[3];
+
+        DateTimeFormatter format = DateTimeFormatter.ofPattern("dd-MMM-yyyy");
+        LocalDate resultDate;
+        resultDate = LocalDate.parse(dateString, format);
+        int resultDayOfYear = resultDate.getDayOfYear();
+
+        Calendar now = Calendar.getInstance();
+        int dayOfYear = now.get(Calendar.DAY_OF_YEAR);
+
+        String content = Files.readString(Path.of(contentPath), StandardCharsets.US_ASCII);
+        String word = Files.readString(Path.of("/home/lb584/software/one_times/lbgmail.txt"), StandardCharsets.US_ASCII);
+        Session session = mailSender.getSession(word.trim());
+
+        if (dayOfYear == resultDayOfYear) {
+            List<String> successEmails = Files.readAllLines(Paths.get(successEmailsFile));
+            sendMailsToList(mailSender, content, session, successEmails);
+        } else {
+            List<String> errorEmails = Files.readAllLines(Paths.get(errorEmailFile));
+            sendMailsToList(mailSender, "ERROR!!!" + content, session, errorEmails);
+        }
 
         int i = 0;
     }
-
 }
